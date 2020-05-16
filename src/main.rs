@@ -9,8 +9,6 @@ use bytesize::ByteSize;
 use clap::arg_enum;
 use structopt::StructOpt;
 use tabwriter::TabWriter;
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
 use walkdir::WalkDir;
 
 struct DirTree {
@@ -71,6 +69,7 @@ struct Opts {
     #[structopt(default_value = ".")]
     root: PathBuf,
 
+    /// Number of file extensions taking up the most space to show.
     #[structopt(short = "e", long = "top-exts")]
     top_exts: Option<usize>,
 
@@ -118,8 +117,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if let Some(top_ext_limit) = opts.top_exts {
         println!("Top {} file types by space usage:", top_ext_limit);
-        print_top_extensions(top_ext_limit, ext_sizes.into_iter().collect())?;
-        println!("");
+        print_top_extensions(top_ext_limit, ext_sizes.into_iter().collect(), opts.reverse)?;
+        println!();
     }
 
     print_space_usage(&opts.root, dir_tree, opts.sort_by, opts.reverse)?;
@@ -130,12 +129,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn print_top_extensions(
     limit: usize,
     ext_sizes: Vec<(OsString, u64)>,
+    ascending: bool,
 ) -> Result<(), Box<dyn Error>> {
     let mut ext_sizes = ext_sizes;
     ext_sizes.sort_by_key(|&(_, size)| Reverse(size));
+    ext_sizes.truncate(limit);
+
+    if !ascending {
+        ext_sizes.reverse();
+    }
 
     let mut tw = TabWriter::new(vec![]);
-    for (ext, size) in ext_sizes.iter().take(limit) {
+    for (ext, size) in ext_sizes.iter() {
         let size_str = format!(
             "{: >10}",
             ByteSize::b(*size).to_string().replace(" B", "  B")
@@ -163,7 +168,7 @@ fn print_space_usage(
         SortBy::Size => directories.sort_by_key(|d| d.size),
     }
 
-    for dir in directories {
+    for dir in &directories {
         let size_str = format!(
             "{: >10}",
             ByteSize::b(dir.size).to_string().replace(" B", "  B")
@@ -180,6 +185,11 @@ fn print_space_usage(
         "{: >10}",
         ByteSize::b(dir_tree.size).to_string().replace(" B", "  B")
     );
+
+    if directories.len() > 0 {
+        writeln!(&mut tw, "----------")?;
+    }
+
     writeln!(
         &mut tw,
         "{:>8}\t{}",

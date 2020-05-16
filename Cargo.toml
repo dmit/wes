@@ -1,7 +1,7 @@
 [package]
 name = "wes"
 description = "Who's Eating Space? Command-line tool to see disk usage."
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Dmitri Melnikov"]
 edition = "2018"
 publish = false
@@ -11,6 +11,5 @@ bytesize = "1"
 clap = "2"
 structopt = "0.3"
 tabwriter = "1"
-tui = { version = "0.6", default-features = false, features = ["crossterm"] }
 walkdir = "2"
 
