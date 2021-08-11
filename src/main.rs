@@ -1,15 +1,31 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap};
-use std::error::Error;
+use std::error::Error as StdError;
 use std::ffi::OsString;
+use std::fmt::Display;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
+use argh::FromArgs;
 use bytesize::ByteSize;
-use clap::arg_enum;
-use structopt::StructOpt;
 use tabwriter::TabWriter;
 use walkdir::WalkDir;
+
+#[derive(Debug)]
+enum Error {
+    InvalidSort(String),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSort(param) => write!(f, "invalid sort parameter: {}", param),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 struct DirTree {
     name: OsString,
@@ -19,11 +35,7 @@ struct DirTree {
 
 impl DirTree {
     fn new(root: OsString) -> DirTree {
-        DirTree {
-            name: root,
-            size: 0,
-            children: BTreeMap::new(),
-        }
+        DirTree { name: root, size: 0, children: BTreeMap::new() }
     }
 
     fn add_dir(&mut self, path: &Path) {
@@ -56,38 +68,54 @@ impl DirTree {
     }
 }
 
-arg_enum! {
-    #[derive(Copy, Clone, Debug)]
-    enum SortBy {
-        Name,
-        Size,
+#[derive(Copy, Clone, Debug)]
+enum SortBy {
+    Name,
+    Size,
+}
+
+impl FromStr for SortBy {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "name" => Ok(Self::Name),
+            "size" => Ok(Self::Size),
+            _ => Err(Error::InvalidSort(s.to_owned())),
+        }
     }
 }
 
-#[derive(StructOpt)]
+#[derive(FromArgs)]
+#[argh(description = "What's Eating Space? Find out which directories take up storage.")]
 struct Opts {
-    #[structopt(default_value = ".")]
-    root: PathBuf,
-
-    /// Number of file extensions taking up the most space to show.
-    #[structopt(short = "e", long = "top-exts")]
+    /// number of file extensions taking up the most space to display
+    #[argh(option, short = 'e', long = "top-exts")]
     top_exts: Option<usize>,
 
-    #[structopt(
-        short = "s",
-        long = "sort",
-        possible_values = &SortBy::variants(),
-        case_insensitive = true,
-        default_value = "size"
-    )]
+    /// how to sort the results (size, name) [default: size]
+    #[argh(option, short = 's', long = "sort", default = "SortBy::Size")]
     sort_by: SortBy,
 
-    #[structopt(short = "r", long = "reverse")]
+    /// reverse the sort order
+    #[argh(switch, short = 'r', long = "reverse")]
     reverse: bool,
+
+    #[argh(positional, default = r#"".".into()"#)]
+    root: PathBuf,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let opts = Opts::from_args();
+fn main() {
+    match run() {
+        Ok(_) => {}
+        Err(err) => {
+            eprintln!("Failed: {}", err);
+        }
+    };
+}
+
+fn run() -> Result<(), Box<dyn StdError>> {
+    let opts: Opts = argh::from_env();
 
     let mut dir_tree = DirTree::new(opts.root.clone().into());
     let mut ext_sizes: HashMap<OsString, u64> = HashMap::new();
@@ -130,7 +158,7 @@ fn print_top_extensions(
     limit: usize,
     ext_sizes: Vec<(OsString, u64)>,
     ascending: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn StdError>> {
     let mut ext_sizes = ext_sizes;
     ext_sizes.sort_by_key(|&(_, size)| Reverse(size));
     ext_sizes.truncate(limit);
@@ -141,10 +169,7 @@ fn print_top_extensions(
 
     let mut tw = TabWriter::new(vec![]);
     for (ext, size) in ext_sizes.iter() {
-        let size_str = format!(
-            "{: >10}",
-            ByteSize::b(*size).to_string().replace(" B", "  B")
-        );
+        let size_str = format!("{: >10}", ByteSize::b(*size).to_string().replace(" B", "  B"));
         writeln!(&mut tw, "{}\t{}", size_str, ext.to_string_lossy())?;
     }
     tw.flush()?;
@@ -158,7 +183,7 @@ fn print_space_usage(
     dir_tree: DirTree,
     sort_by: SortBy,
     reverse: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn StdError>> {
     let mut tw = TabWriter::new(vec![]);
     let mut directories = dir_tree.children.values().collect::<Vec<_>>();
     match sort_by {
@@ -169,10 +194,7 @@ fn print_space_usage(
     }
 
     for dir in &directories {
-        let size_str = format!(
-            "{: >10}",
-            ByteSize::b(dir.size).to_string().replace(" B", "  B")
-        );
+        let size_str = format!("{: >10}", ByteSize::b(dir.size).to_string().replace(" B", "  B"));
         writeln!(
             &mut tw,
             "{}\t{}",
@@ -181,21 +203,13 @@ fn print_space_usage(
         )?;
     }
 
-    let size_str = format!(
-        "{: >10}",
-        ByteSize::b(dir_tree.size).to_string().replace(" B", "  B")
-    );
+    let size_str = format!("{: >10}", ByteSize::b(dir_tree.size).to_string().replace(" B", "  B"));
 
-    if directories.len() > 0 {
+    if !directories.is_empty() {
         writeln!(&mut tw, "----------")?;
     }
 
-    writeln!(
-        &mut tw,
-        "{:>8}\t{}",
-        format!("{: >8}", size_str),
-        dir_tree.name.to_string_lossy()
-    )?;
+    writeln!(&mut tw, "{:>8}\t{}", format!("{: >8}", size_str), dir_tree.name.to_string_lossy())?;
     tw.flush()?;
     io::stdout().write_all(&tw.into_inner()?)?;
 

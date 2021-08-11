@@ -1,15 +1,15 @@
 [package]
 name = "wes"
 description = "Who's Eating Space? Command-line tool to see disk usage."
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Dmitri Melnikov"]
 edition = "2018"
+resolver = "2"
 publish = false
 
 [dependencies]
-bytesize = "1"
-clap = "2"
-structopt = "0.3"
-tabwriter = "1"
-walkdir = "2"
+argh = "0.1.5"
+bytesize = "1.1.0"
+tabwriter = "1.2.1"
+walkdir = "2.3.2"
 
