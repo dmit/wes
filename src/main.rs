@@ -1,5 +1,4 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, HashMap};
 use std::error::Error as StdError;
 use std::ffi::OsString;
 use std::fmt::Display;
@@ -7,6 +6,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use ahash::AHashMap;
 use argh::FromArgs;
 use bytesize::ByteSize;
 use tabwriter::TabWriter;
@@ -30,12 +30,12 @@ impl std::error::Error for Error {}
 struct DirTree {
     name: OsString,
     size: u64,
-    children: BTreeMap<OsString, DirTree>,
+    children: AHashMap<OsString, DirTree>,
 }
 
 impl DirTree {
     fn new(root: OsString) -> DirTree {
-        DirTree { name: root, size: 0, children: BTreeMap::new() }
+        DirTree { name: root, size: 0, children: AHashMap::new() }
     }
 
     fn add_dir(&mut self, path: &Path) {
@@ -118,7 +118,7 @@ fn run() -> Result<(), Box<dyn StdError>> {
     let opts: Opts = argh::from_env();
 
     let mut dir_tree = DirTree::new(opts.root.clone().into());
-    let mut ext_sizes: HashMap<OsString, u64> = HashMap::new();
+    let mut ext_sizes: AHashMap<OsString, u64> = AHashMap::new();
 
     for entry in WalkDir::new(&opts.root) {
         match entry {
