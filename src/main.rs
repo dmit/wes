@@ -160,20 +160,19 @@ fn print_top_extensions(
     ascending: bool,
 ) -> Result<(), Box<dyn StdError>> {
     let mut ext_sizes = ext_sizes;
-    ext_sizes.sort_by_key(|&(_, size)| Reverse(size));
+    ext_sizes.sort_unstable_by_key(|&(_, size)| Reverse(size));
     ext_sizes.truncate(limit);
 
     if !ascending {
         ext_sizes.reverse();
     }
 
-    let mut tw = TabWriter::new(vec![]);
+    let mut tw = TabWriter::new(std::io::stdout());
     for (ext, size) in ext_sizes.iter() {
         let size_str = format!("{: >10}", ByteSize::b(*size).to_string().replace(" B", "  B"));
-        writeln!(&mut tw, "{}\t{}", size_str, ext.to_string_lossy())?;
+        writeln!(tw, "{}\t{}", size_str, ext.to_string_lossy())?;
     }
     tw.flush()?;
-    io::stdout().write_all(&tw.into_inner()?)?;
 
     Ok(())
 }
@@ -197,8 +196,8 @@ fn print_space_usage(
         let size_str = format!("{: >10}", ByteSize::b(dir.size).to_string().replace(" B", "  B"));
         writeln!(
             &mut tw,
-            "{}\t{}",
-            format!("{: >8}", size_str),
+            "{: >8}\t{}",
+            size_str,
             root.join(dir.name.clone()).to_string_lossy()
         )?;
     }
@@ -209,7 +208,7 @@ fn print_space_usage(
         writeln!(&mut tw, "----------")?;
     }
 
-    writeln!(&mut tw, "{:>8}\t{}", format!("{: >8}", size_str), dir_tree.name.to_string_lossy())?;
+    writeln!(&mut tw, "{: >8}\t{}", size_str, dir_tree.name.to_string_lossy())?;
     tw.flush()?;
     io::stdout().write_all(&tw.into_inner()?)?;
 
