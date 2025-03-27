@@ -2,15 +2,15 @@
 name = "wes"
 description = "Who's Eating Space? Command-line tool to see disk usage."
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
-ahash = "0.7.6"
-argh = "0.1.7"
-bytesize = "1.1.0"
-tabwriter = "1.2.1"
-walkdir = "2.3.2"
+ahash = "0.8.11"
+argh = "0.1.13"
+bytesize = "2.0.1"
+tabwriter = "1.4.1"
+walkdir = "2.5.0"
 
 [profile.release]
 debug = 2

@@ -156,10 +156,9 @@ fn run() -> Result<(), Box<dyn StdError>> {
 
 fn print_top_extensions(
     limit: usize,
-    ext_sizes: Vec<(OsString, u64)>,
+    mut ext_sizes: Vec<(OsString, u64)>,
     ascending: bool,
 ) -> Result<(), Box<dyn StdError>> {
-    let mut ext_sizes = ext_sizes;
     ext_sizes.sort_unstable_by_key(|&(_, size)| Reverse(size));
     ext_sizes.truncate(limit);
 
@@ -194,12 +193,7 @@ fn print_space_usage(
 
     for dir in &directories {
         let size_str = format!("{: >10}", ByteSize::b(dir.size).to_string().replace(" B", "  B"));
-        writeln!(
-            &mut tw,
-            "{: >8}\t{}",
-            size_str,
-            root.join(dir.name.clone()).to_string_lossy()
-        )?;
+        writeln!(&mut tw, "{: >8}\t{}", size_str, root.join(dir.name.clone()).to_string_lossy())?;
     }
 
     let size_str = format!("{: >10}", ByteSize::b(dir_tree.size).to_string().replace(" B", "  B"));
